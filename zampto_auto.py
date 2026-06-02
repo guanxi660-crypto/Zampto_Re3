@@ -132,13 +132,12 @@ def dismiss_all_popups(page):
         closed = page.evaluate("""() => {
             var count = 0;
 
-            // ① 优先找带明确文字的关闭按钮
+            // ① 优先找带明确文字的关闭按钮（在弹窗容器内）
             var closeTexts = ['Close', 'close', 'Schließen', '×', 'X'];
             for (var t of closeTexts) {
                 var btns = Array.from(document.querySelectorAll('button, a, [role="button"]'));
                 for (var b of btns) {
                     if (b.innerText && b.innerText.trim() === t) {
-                        // 确认它在某种弹窗/overlay 容器内
                         var parent = b.closest('[class*="modal"],[class*="popup"],[class*="overlay"],[class*="dialog"],[class*="ad-"]');
                         if (parent) { b.click(); count++; break; }
                     }
@@ -154,6 +153,21 @@ def dismiss_all_popups(page):
             for (var gt of gdprTexts) {
                 var gb = Array.from(document.querySelectorAll('button')).find(b => b.innerText.trim() === gt);
                 if (gb) { gb.click(); count++; break; }
+            }
+
+            // ④ Zampto continue-prompt 弹窗（class="continue-prompt-text" 或 close-button-protector）
+            var cpClose = document.querySelector(
+                '.close-button-protector, .dismiss-button, .dismiss-button-protector, ' +
+                '[class*="continue-prompt"] button, [class*="close-button-protector"]'
+            );
+            if (cpClose) { cpClose.click(); count++; }
+
+            // ⑤ 任何可见的固定定位遮罩层（z-index 高），尝试点击其内部关闭按钮
+            var overlays = Array.from(document.querySelectorAll('div[style*="position: fixed"], div[style*="position:fixed"]'));
+            for (var ov of overlays) {
+                if (ov.offsetParent === null) continue;
+                var closeBtn = ov.querySelector('button, [role="button"], a');
+                if (closeBtn) { closeBtn.click(); count++; break; }
             }
 
             return count;
@@ -598,13 +612,13 @@ def renew_server(page, server_id: str, expiry_before: str) -> bool:
 
     log.info(f"续期前 expiry 分钟数: {minutes_before}, 续期后: {minutes_after}")
 
-    # 成功条件：续期后时间 > 续期前时间（增加了说明成功），或续期后时间接近2天（>= 23h）
-    if minutes_after > minutes_before or minutes_after >= 23 * 60:
-        log.info(f"✅ 续期成功！expiry: {expiry_before} → {info_after}")
+    # 成功条件：续期后分钟数 > 续期前分钟数（时间增加了说明续期生效）
+    if minutes_after > minutes_before:
+        log.info(f"✅ 续期成功！expiry: {expiry_before} → {info_after}（增加了 {minutes_after - minutes_before} 分钟）")
         return True
 
-    # 如果数值没变或变小，可能真的没续期成功
-    log.warning(f"⚠️ 续期后 expiry 未增加（{expiry_before} → {info_after}），续期可能失败")
+    log.warning(f"⚠️ 续期后 expiry 未增加（{expiry_before} → {info_after}），续期失败！"
+                f"（前={minutes_before}min，后={minutes_after}min）")
     return False
 
 # ---------- 主流程 ----------
