@@ -747,7 +747,7 @@ def main():
         wxpush("❌ 未配置 ZAMPTO_SERVER_ID，任务中止")
         return
 
-    PROXY_SERVER = "socks5://127.0.0.1:10808"
+    PROXY_SERVER = "socks5://127.0.0.1:1080"
 
     log.info("启动 CloakBrowser...")
     browser = launch(
